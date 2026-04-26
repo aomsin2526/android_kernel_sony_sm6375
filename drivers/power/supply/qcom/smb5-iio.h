@@ -201,7 +201,7 @@ static const struct smb5_iio_prop_channels smb5_chans_pmic[] = {
 	SMB5_CHAN_ACTIVITY("battery_force_recharge", FORCE_RECHARGE)
 	SMB5_CHAN_ACTIVITY("battery_fcc_stepper_enable", FCC_STEPPER_ENABLE)
 	SMB5_CHAN_INDEX("usb_typec_accessory_mode", TYPEC_ACCESSORY_MODE)
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	SMB5_CHAN_INDEX("battery_charger_enabled", CHARGER_ENABLED)
 	SMB5_CHAN_INDEX("battery_lrc_enable", LRC_ENABLE)
 	SMB5_CHAN_INDEX("battery_smart_charging_activation", SMART_CHARGING_ACTIVATION)

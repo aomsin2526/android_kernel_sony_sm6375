@@ -51,10 +51,11 @@ static const char *qg_get_battery_type(struct qpnp_qg *chip);
 static int qg_process_rt_fifo(struct qpnp_qg *chip);
 static int qg_load_battery_profile(struct qpnp_qg *chip);
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-static int qg_debug_mask = QG_DEBUG_SOMC | QG_DEBUG_PROFILE;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static int qg_debug_mask;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static int qg_debug_mask = QG_DEBUG_SOMC | QG_DEBUG_PROFILE;
 #endif
 
 static int qg_esr_mod_count = 30;
@@ -1624,10 +1625,11 @@ static int qg_store_learned_capacity(void *data, int64_t learned_cap_uah)
 	if (chip->battery_missing || !learned_cap_uah)
 		return -ENODEV;
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	cc_mah = DIV_ROUND_CLOSEST(learned_cap_uah, 1000);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	cc_mah = div64_s64(learned_cap_uah, 1000);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	cc_mah = DIV_ROUND_CLOSEST(learned_cap_uah, 1000);
 #endif
 	rc = qg_sdam_multibyte_write(QG_SDAM_LEARNED_CAPACITY_OFFSET,
 					 (u8 *)&cc_mah, 2);
@@ -1636,11 +1638,12 @@ static int qg_store_learned_capacity(void *data, int64_t learned_cap_uah)
 		return rc;
 	}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	qg_dbg(chip, QG_DEBUG_SOMC, "Stored learned capacity %llduah\n",
-					learned_cap_uah);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	qg_dbg(chip, QG_DEBUG_ALG_CL, "Stored learned capacity %llduah\n",
+					learned_cap_uah);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	qg_dbg(chip, QG_DEBUG_SOMC, "Stored learned capacity %llduah\n",
 					learned_cap_uah);
 #endif
 	return 0;
@@ -1687,7 +1690,7 @@ static int qg_store_batt_age_level(void *data, u32 batt_age_level)
 	return 0;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static int qg_somc_get_monotonic_soc(void *data, int *msoc)
 {
 	struct qpnp_qg *chip = data;
@@ -2089,7 +2092,7 @@ done:
 
 static int qg_setprop_batt_age_level(struct qpnp_qg *chip, int batt_age_level)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc = 0;
 
 	if (batt_age_level != chip->batt_age_level) {
@@ -2108,7 +2111,8 @@ static int qg_setprop_batt_age_level(struct qpnp_qg *chip, int batt_age_level)
 			power_supply_changed(chip->qg_psy);
 	}
 	return 0;
-#else
+#endif
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc = 0;
 	u16 data = 0;
 
@@ -2148,7 +2152,7 @@ static int qg_setprop_batt_age_level(struct qpnp_qg *chip, int batt_age_level)
 #endif
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 int qg_somc_get_aux_temp(struct qpnp_qg *chip, int *val)
 {
 	int rc = 0;
@@ -2250,17 +2254,7 @@ static int qg_iio_write_raw(struct iio_dev *indio_dev,
 
 	switch (chan->channel) {
 	case PSY_IIO_CHARGE_FULL:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-		mutex_lock(&chip->cl->lock);
-		chip->cl->learned_cap_uah = val1;
-		cap_learning_somc_limit_learned_cap(chip->cl);
-		rc = qg_store_learned_capacity(chip, chip->cl->learned_cap_uah);
-		mutex_unlock(&chip->cl->lock);
-		if (chip->cl->learned_cap_uah == chip->cl->nom_cap_uah)
-			qg_reset(chip);
-		if (chip->cl->active)
-			cap_learning_abort(chip->cl);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chip->dt.cl_disable) {
 			pr_warn("Capacity learning disabled!\n");
 			return 0;
@@ -2278,6 +2272,17 @@ static int qg_iio_write_raw(struct iio_dev *indio_dev,
 		if (!rc)
 			chip->cl->learned_cap_uah = val1;
 		mutex_unlock(&chip->cl->lock);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		mutex_lock(&chip->cl->lock);
+		chip->cl->learned_cap_uah = val1;
+		cap_learning_somc_limit_learned_cap(chip->cl);
+		rc = qg_store_learned_capacity(chip, chip->cl->learned_cap_uah);
+		mutex_unlock(&chip->cl->lock);
+		if (chip->cl->learned_cap_uah == chip->cl->nom_cap_uah)
+			qg_reset(chip);
+		if (chip->cl->active)
+			cap_learning_abort(chip->cl);
 #endif
 		break;
 	case PSY_IIO_SOH:
@@ -2300,11 +2305,11 @@ static int qg_iio_write_raw(struct iio_dev *indio_dev,
 		qg_reset(chip);
 		break;
 	case PSY_IIO_BATT_AGE_LEVEL:
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY) /* RID011075 Soft charge 5.1 */
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) /* RID011075 Soft charge 5.1 */
 		rc = qg_setprop_batt_age_level(chip, val1);
 #endif
 		break;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	case PSY_IIO_REAL_TEMP:
 		rc = qg_somc_set_real_temp_debug(chip, val1);
 		if (rc < 0) {
@@ -2361,7 +2366,10 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 		rc = qg_sdam_read(SDAM_OCV_UV, val1);
 		break;
 	case PSY_IIO_TEMP:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		rc = qg_get_battery_temp(chip, val1);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		/* Get real_temp */
 		if (chip->use_real_temp)
 			rc = qg_somc_get_real_temp(chip, val1);
@@ -2372,8 +2380,6 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 			pr_err("failed to get temp\n");
 			*val1 = 250;
 		}
-#else
-		rc = qg_get_battery_temp(chip, val1);
 #endif
 		break;
 	case PSY_IIO_RESISTANCE_ID:
@@ -2400,13 +2406,14 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 		*val1 = chip->bp.float_volt_uv;
 		break;
 	case PSY_IIO_BATT_FULL_CURRENT:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		*val1 = chip->dt.iterm_ma * 1000;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chip->step_ibatt_full)
 			*val1 = chip->step_ibatt_full * 1000;
 		else
 			*val1 = chip->dt.iterm_ma * 1000;
-#else
-		*val1 = chip->dt.iterm_ma * 1000;
 #endif
 		break;
 	case PSY_IIO_BATT_PROFILE_VERSION:
@@ -2424,7 +2431,12 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 			*val1 = (int)temp;
 		break;
 	case PSY_IIO_CHARGE_FULL_DESIGN:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		rc = qg_get_nominal_capacity((int *)&temp, 250, true);
+		if (!rc)
+			*val1 = (int)temp;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chip->initial_capacity >= 0) {
 			*val1 = chip->initial_capacity;
 		} else {
@@ -2432,10 +2444,6 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 			if (!rc)
 				*val1 = (int)temp;
 		}
-#else
-		rc = qg_get_nominal_capacity((int *)&temp, 250, true);
-		if (!rc)
-			*val1 = (int)temp;
 #endif
 		break;
 	case PSY_IIO_CYCLE_COUNT:
@@ -2491,7 +2499,7 @@ static int qg_iio_read_raw(struct iio_dev *indio_dev,
 	case PSY_IIO_FG_TYPE:
 		*val1 = chip->qg_mode;
 		break;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	case PSY_IIO_REAL_TEMP:
 		rc = qg_somc_get_real_temp(chip, val1);
 		break;
@@ -2614,13 +2622,14 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 				chip->msoc, health, chip->charge_full,
 				chip->charge_done);
 	if (chip->charge_done && !chip->charge_full) {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-		if (chip->msoc > 99 && health == POWER_SUPPLY_HEALTH_GOOD) {
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chip->msoc >= 99 && health == POWER_SUPPLY_HEALTH_GOOD) {
 #endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		if (chip->msoc > 99 && health == POWER_SUPPLY_HEALTH_GOOD) {
+#endif
 			chip->charge_full = true;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 			chip->full_counter++;
 #endif
 			qg_dbg(chip, QG_DEBUG_STATUS, "Setting charge_full (0->1) @ msoc=%d\n",
@@ -2666,7 +2675,7 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 				qg_scale_soc(chip, false);
 			}
 			chip->charge_full = false;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 			chip->recharge_counter++;
 #endif
 			qg_dbg(chip, QG_DEBUG_STATUS, "msoc=%d recharge_soc=%d charge_full (1->0)\n",
@@ -2864,7 +2873,7 @@ static void qg_sleep_exit_work(struct work_struct *work)
 	vote(chip->awake_votable, SLEEP_EXIT_VOTER, false, 0);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void qg_somc_jeita_step_wakelock(struct qpnp_qg *chip, bool en)
 {
 	if (en)
@@ -3435,7 +3444,7 @@ static void qg_status_change_work(struct work_struct *work)
 		pr_err("Failed in charge_full_update, rc=%d\n", rc);
 
 	ttf_update(chip->ttf, input_present);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	qg_somc_jeita_step_update(chip);
 	chip->prev_charge_status = chip->charge_status;
 #endif
@@ -3795,7 +3804,7 @@ static int get_batt_id_ohm(struct qpnp_qg *chip, u32 *batt_id_ohm)
 	return 0;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define PROPERTY_NAME_SIZE 128
 #endif
 static int qg_load_battery_profile(struct qpnp_qg *chip)
@@ -3803,7 +3812,7 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 	struct device_node *node = chip->dev->of_node;
 	struct device_node *profile_node;
 	int rc, tuple_len, len, i, avail_age_level = 0;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int num, lv;
 	int step_len;
 	u32 step_buf[STEP_DATA_DT_MAX_NUM];
@@ -3838,7 +3847,7 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 			chip->batt_age_level = avail_age_level;
 		}
 	} else {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chip->batt_age_level == -EINVAL) {
 			rc = qg_get_batt_age_level(chip, &chip->batt_age_level);
 			if (rc < 0) {
@@ -3900,7 +3909,7 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 		pr_err("Failed to read QG profile version rc:%d\n", rc);
 		chip->bp.qg_profile_version = -EINVAL;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	rc = of_property_read_u32(profile_node, "somc,initial-capacity-uah",
 				&chip->initial_capacity);
 	if (rc < 0) {
@@ -3968,7 +3977,7 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 		}
 	}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	mutex_lock(&chip->step_lock);
 	chip->step_en = false;
 	rc = of_property_count_elems_of_size(profile_node,
@@ -4267,7 +4276,7 @@ done:
 	if (chip->qg_mode == QG_V_I_MODE)
 		chip->cc_soc = soc_raw;
 	chip->sys_soc = soc_raw;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->batt_soc = soc_raw;
 #endif
 	chip->last_adj_ssoc = chip->catch_up_soc = chip->msoc = soc;
@@ -4608,9 +4617,10 @@ done_fifo:
 
 static int qg_soh_batt_profile_init(struct qpnp_qg *chip)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	return 0;
-#else
+#endif
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc = 0;
 
 	if (!chip->dt.multi_profile_load)
@@ -4806,7 +4816,7 @@ static int qg_alg_init(struct qpnp_qg *chip)
 	cl->get_learned_capacity = qg_get_learned_capacity;
 	cl->store_learned_capacity = qg_store_learned_capacity;
 	cl->ok_to_begin = qg_cl_ok_to_begin;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI) /* RID011075 Soft charge 5.1 */
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION) /* RID011075 Soft charge 5.1 */
 	cl->get_monotonic_soc = qg_somc_get_monotonic_soc;
 #endif
 	cl->data = chip;
@@ -4959,11 +4969,7 @@ static int qg_parse_s2_dt(struct qpnp_qg *chip)
 }
 
 #define DEFAULT_CL_MIN_START_SOC	10
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 #define DEFAULT_CL_MAX_START_SOC	40
-#else
-#define DEFAULT_CL_MAX_START_SOC	15
-#endif
 #define DEFAULT_CL_MIN_TEMP_DECIDEGC	150
 #define DEFAULT_CL_MAX_TEMP_DECIDEGC	500
 #define DEFAULT_CL_MAX_INC_DECIPERC	10
@@ -5072,7 +5078,7 @@ static int qg_parse_cl_dt(struct qpnp_qg *chip)
 #define DEFAULT_FVSS_VBAT_MV		3500
 #define DEFAULT_TCSS_ENTRY_SOC		90
 #define DEFAULT_ESR_LOW_TEMP_THRESHOLD	100 /* 10 deg */
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define DEFAULT_MAX_FV_MV		4480
 #endif
 static int qg_parse_dt(struct qpnp_qg *chip)
@@ -5323,7 +5329,7 @@ static int qg_parse_dt(struct qpnp_qg *chip)
 	chip->dt.multi_profile_load = of_property_read_bool(node,
 					"qcom,multi-profile-load");
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->use_real_temp = of_property_read_bool(node,
 					"somc,jeita-step-use-real-temp");
 	if (chip->use_real_temp) {
@@ -5366,7 +5372,7 @@ static int qg_parse_dt(struct qpnp_qg *chip)
 	return 0;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 /*****************************
  * somc sysfs implementation *
  *****************************/
@@ -5872,7 +5878,7 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 		chip->batt_therm_chan = NULL;
 		return rc;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->aux_temp_chan = iio_channel_get(&pdev->dev, "aux-temp");
 	if (IS_ERR(chip->aux_temp_chan)) {
 		rc = PTR_ERR(chip->aux_temp_chan);
@@ -5888,7 +5894,7 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 	INIT_WORK(&chip->udata_work, process_udata_work);
 	INIT_WORK(&chip->qg_status_change_work, qg_status_change_work);
 	INIT_DELAYED_WORK(&chip->qg_sleep_exit_work, qg_sleep_exit_work);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	INIT_DELAYED_WORK(&chip->somc_jeita_step_charge_work,
 					qg_somc_jeita_step_charge_work);
 	INIT_WORK(&chip->psy_chg_work, qg_somc_psy_chg_work);
@@ -5906,7 +5912,7 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 	mutex_init(&chip->bus_lock);
 	mutex_init(&chip->soc_lock);
 	mutex_init(&chip->data_lock);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	mutex_init(&chip->step_lock);
 #endif
 	init_waitqueue_head(&chip->qg_wait_q);
@@ -5920,7 +5926,7 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 	chip->esr_actual = -EINVAL;
 	chip->esr_nominal = -EINVAL;
 	chip->batt_age_level = -EINVAL;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->real_temp_debug = -EINVAL;
 #endif
 
@@ -6071,7 +6077,7 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 		pr_err("Failed to initialize QG PSY, rc=%d\n", rc);
 		goto fail_votable;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	rc = qg_somc_create_sysfs_entries(chip->dev);
 	if (rc < 0) {
 		dev_err(chip->dev,
@@ -6127,7 +6133,7 @@ static int qpnp_qg_remove(struct platform_device *pdev)
 	cancel_delayed_work_sync(&chip->qg_sleep_exit_work);
 	cancel_work_sync(&chip->udata_work);
 	cancel_work_sync(&chip->qg_status_change_work);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	cancel_work_sync(&chip->psy_chg_work);
 #endif
 	sysfs_remove_groups(&chip->dev->kobj, qg_groups);
@@ -6140,7 +6146,7 @@ static int qpnp_qg_remove(struct platform_device *pdev)
 	mutex_destroy(&chip->soc_lock);
 	if (chip->awake_votable)
 		destroy_votable(chip->awake_votable);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	wakeup_source_unregister(chip->step_ws);
 	qg_somc_remove_sysfs_entries(chip->dev);
 #endif

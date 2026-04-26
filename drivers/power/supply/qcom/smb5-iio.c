@@ -267,7 +267,7 @@ int smb5_iio_get_prop(struct smb_charger *chg, int channel, int *val)
 	case PSY_IIO_TYPEC_ACCESSORY_MODE:
 		rc = smblib_get_usb_prop_typec_accessory_mode(chg, val);
 		break;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	case PSY_IIO_CHARGER_ENABLED:
 		rc = smblib_get_prop_charging_enabled(chg, &pval);
 		if (!rc)
@@ -534,12 +534,12 @@ int smb5_iio_set_prop(struct smb_charger *chg, int channel, int val)
 		/* Not in ship mode as long as the device is active */
 		if (!val)
 			break;
-#if defined(CONFIG_ARCH_SONY_MURRAY)
+/*modify for avoid dump when set shipmode
 		if (chg->iio_chan_list_smb_parallel)
 			rc = iio_write_channel_raw(
 				chg->iio_chan_list_smb_parallel[SMB_SET_SHIP_MODE],
 				val);
-#endif
+*/
 		rc = smblib_set_prop_ship_mode(chg, val);
 		break;
 	case PSY_IIO_RERUN_AICL:
@@ -572,7 +572,7 @@ int smb5_iio_set_prop(struct smb_charger *chg, int channel, int val)
 	case PSY_IIO_FCC_STEPPER_ENABLE:
 		chg->fcc_stepper_enable = val;
 		break;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	case PSY_IIO_CHARGER_ENABLED:
 		pval.intval = val;
 		rc = smblib_set_prop_charging_enabled(chg, &pval);

@@ -101,7 +101,7 @@ static const struct qg_iio_channels qg_iio_psy_channels[] = {
 	QG_CHAN_ACT("scale_mode_en", PSY_IIO_SCALE_MODE_EN)
 	QG_CHAN_INDEX("batt_age_level", PSY_IIO_BATT_AGE_LEVEL)
 	QG_CHAN_ACT("fg_type", PSY_IIO_FG_TYPE)
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	QG_CHAN_TEMP("real_temp", PSY_IIO_REAL_TEMP)
 	QG_CHAN_TEMP("aux_temp", PSY_IIO_AUX_TEMP)
 	QG_CHAN_ENERGY("charge_full_raw", PSY_IIO_CHARGE_FULL_RAW)
@@ -126,7 +126,7 @@ enum qg_ext_iio_channels {
 	CHARGE_DONE,
 	PARALLEL_CHARGING_ENABLED,
 	CP_CHARGING_ENABLED,
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI) /* RID007053 Step charge1.0 */
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION) /* RID007053 Step charge1.0 */
 	JEITA_STEP_FCC,
 	JEITA_STEP_FV,
 	JEITA_STEP_ITERM,
@@ -142,7 +142,7 @@ static const char * const qg_ext_iio_chan_name[] = {
 	[CHARGE_DONE]			= "charge_done",
 	[PARALLEL_CHARGING_ENABLED]	= "parallel_charging_enabled",
 	[CP_CHARGING_ENABLED]		= "cp_charging_enabled",
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	[JEITA_STEP_FCC]       = "jeita_step_fcc",
 	[JEITA_STEP_FV]        = "jeita_step_fv",
 	[JEITA_STEP_ITERM]     = "jeita_step_iterm",

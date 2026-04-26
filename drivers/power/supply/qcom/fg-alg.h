@@ -59,7 +59,7 @@ struct cap_learning {
 	int64_t			learned_cap_uah;
 	int64_t			delta_cap_uah;
 	bool			active;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int			batt_soc_cp_drop;
 	int			cc_soc_drop;
 	int			max_bsoc_cp_during_active;
@@ -79,7 +79,7 @@ struct cap_learning {
 	int (*store_learned_capacity)(void *data, int64_t learned_cap_uah);
 	int (*get_cc_soc)(void *data, int *cc_soc_sw);
 	int (*prime_cc_soc)(void *data, u32 cc_soc_sw);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int (*get_monotonic_soc)(void *data, int *msoc);
 #endif
 };
@@ -177,7 +177,7 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 int cap_learning_init(struct cap_learning *cl);
 int cap_learning_post_profile_init(struct cap_learning *cl,
 		int64_t nom_cap_uah);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 void cap_learning_somc_limit_learned_cap(struct cap_learning *cl);
 #endif
 void ttf_update(struct ttf *ttf, bool input_present);

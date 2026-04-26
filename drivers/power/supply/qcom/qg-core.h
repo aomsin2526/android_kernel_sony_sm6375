@@ -91,7 +91,7 @@ struct qg_esr_data {
 	bool			valid;
 };
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define STEP_INPUT_BUF_NUM 3
 struct qg_step_input {
 	int	temp;
@@ -252,7 +252,7 @@ struct qpnp_qg {
 	struct cycle_counter	*counter;
 	/* ttf */
 	struct ttf		*ttf;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	/* JEITA/Step charge */
 	int			prev_charge_status;
 	struct delayed_work	somc_jeita_step_charge_work;
@@ -334,7 +334,7 @@ enum debug_mask {
 	QG_DEBUG_BUS_WRITE	= BIT(9),
 	QG_DEBUG_ALG_CL		= BIT(10),
 	QG_DEBUG_ESR		= BIT(11),
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	QG_DEBUG_SOMC_STEP	= BIT(14),
 	QG_DEBUG_SOMC		= BIT(15),
 #endif

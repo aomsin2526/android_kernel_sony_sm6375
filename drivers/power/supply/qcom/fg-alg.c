@@ -16,14 +16,15 @@
 #include <dt-bindings/iio/qti_power_supply_iio.h>
 #include "fg-alg.h"
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define fg_alg_somc_cl_dbg(fmt, ...) pr_info("[SOMC CL]"fmt, ##__VA_ARGS__)
 #endif
 #define FULL_SOC_RAW		255
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-#define CAPACITY_DELTA_DECIPCT	400
-#else
-#define CAPACITY_DELTA_DECIPCT	500
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define CAPACITY_DELTA_DECIPCT 500
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define CAPACITY_DELTA_DECIPCT 400
 #endif
 
 #define CENTI_FULL_SOC		10000
@@ -40,7 +41,7 @@
 #define DEFAULT_TTF_RUN_PERIOD_MS	10000
 #define DEFAULT_TTF_ITERM_DELTA_MA	200
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define CL_LOWER_LIMIT_PCT		98 /* 98 percent */
 #define CL_ABORT_BSOC_CP		200 /* 2.00 percent */
 #define CL_ABORT_CCSOC_CP		50 /* 0.50 percent */
@@ -315,7 +316,7 @@ int cycle_count_init(struct cycle_counter *counter)
 
 /* Capacity learning algorithm APIs */
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static int conv_cc_soc_to_cp(struct cap_learning *cl, int cc_soc)
 {
 	int val;
@@ -339,40 +340,7 @@ static int conv_cc_soc_to_cp(struct cap_learning *cl, int cc_soc)
  */
 static void cap_learning_post_process(struct cap_learning *cl)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	int rc;
-	int64_t lower_cap_uah, store_cap_uah;
-
-	if (!cl->store_learned_capacity)
-		return;
-
-	store_cap_uah = cl->final_cap_uah;
-	if (cl->final_cap_uah > cl->nom_cap_uah) {
-		fg_alg_somc_cl_dbg("learning capacity %lld goes above nom_cap %lld\n",
-					cl->final_cap_uah, cl->nom_cap_uah);
-		store_cap_uah = cl->nom_cap_uah;
-	}
-
-	lower_cap_uah = div64_u64(cl->learned_cap_uah * CL_LOWER_LIMIT_PCT,
-									100);
-	if (cl->final_cap_uah < lower_cap_uah) {
-		fg_alg_somc_cl_dbg("learning capacity %lld goes below lower limited cap %lld\n",
-					cl->final_cap_uah, lower_cap_uah);
-		store_cap_uah = lower_cap_uah;
-	}
-
-	if (cl->learned_cap_uah != store_cap_uah) {
-		fg_alg_somc_cl_dbg("store learning capacity %lld\n",
-								store_cap_uah);
-		rc = cl->store_learned_capacity(cl->data, store_cap_uah);
-		if (rc < 0) {
-			pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
-			return;
-		}
-	}
-	cl->learned_cap_uah = store_cap_uah;
-	cl->learning_counter++;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int64_t max_inc_val, min_dec_val, old_cap;
 	int rc;
 
@@ -429,9 +397,43 @@ static void cap_learning_post_process(struct cap_learning *cl)
 	pr_debug("final cap_uah = %lld, learned capacity %lld -> %lld uah\n",
 		cl->final_cap_uah, old_cap, cl->learned_cap_uah);
 #endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc;
+	int64_t lower_cap_uah, store_cap_uah;
+
+	if (!cl->store_learned_capacity)
+		return;
+
+	store_cap_uah = cl->final_cap_uah;
+	if (cl->final_cap_uah > cl->nom_cap_uah) {
+		fg_alg_somc_cl_dbg("learning capacity %lld goes above nom_cap %lld\n",
+					cl->final_cap_uah, cl->nom_cap_uah);
+		store_cap_uah = cl->nom_cap_uah;
+	}
+
+	lower_cap_uah = div64_u64(cl->learned_cap_uah * CL_LOWER_LIMIT_PCT,
+									100);
+	if (cl->final_cap_uah < lower_cap_uah) {
+		fg_alg_somc_cl_dbg("learning capacity %lld goes below lower limited cap %lld\n",
+					cl->final_cap_uah, lower_cap_uah);
+		store_cap_uah = lower_cap_uah;
+	}
+
+	if (cl->learned_cap_uah != store_cap_uah) {
+		fg_alg_somc_cl_dbg("store learning capacity %lld\n",
+								store_cap_uah);
+		rc = cl->store_learned_capacity(cl->data, store_cap_uah);
+		if (rc < 0) {
+			pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
+			return;
+		}
+	}
+	cl->learned_cap_uah = store_cap_uah;
+	cl->learning_counter++;
+#endif
 }
 
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 /**
  * cap_wt_learning_process_full_data -
  * @cl: Capacity learning object
@@ -493,25 +495,7 @@ static int cap_wt_learning_process_full_data(struct cap_learning *cl,
 static int cap_learning_process_full_data(struct cap_learning *cl,
 					int batt_soc_cp)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	int rc, cc_soc_sw, cc_delta;
-	int64_t cc_delta_100pct, cc_delta_uah;
-
-	rc = cl->get_cc_soc(cl->data, &cc_soc_sw);
-	if (rc < 0) {
-		pr_err("Error in getting CC_SOC_SW, rc=%d\n", rc);
-		return rc;
-	}
-
-	cc_delta = cc_soc_sw - cl->init_cc_soc_sw;
-	cc_delta_100pct = conv_cc_soc_to_cp(cl, cc_delta);
-	cc_delta_uah = div64_s64(cl->learned_cap_uah * cc_delta_100pct, 10000);
-	cl->final_cap_uah = cl->init_cap_uah + cc_delta_uah;
-	fg_alg_somc_cl_dbg("cc_delta_100pct:%d cc_delta_uah:%d init_cap_uah:%d final_cap_uah:%d\n",
-					cc_delta_100pct, cc_delta_uah,
-					cl->init_cap_uah, cl->final_cap_uah);
-	return 0;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc, cc_soc_sw, cc_soc_delta_pct, delta_batt_soc_pct, batt_soc_pct,
 		cc_soc_fraction;
 	int64_t cc_soc_cap_uah, cc_soc_fraction_uah;
@@ -549,6 +533,25 @@ static int cap_learning_process_full_data(struct cap_learning *cl,
 	cl->final_cap_uah = cl->init_cap_uah + cl->delta_cap_uah;
 	pr_debug("Current cc_soc=%d cc_soc_delta_pct=%d total_cap_uah=%lld\n",
 		cc_soc_sw, cc_soc_delta_pct, cl->final_cap_uah);
+	return 0;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc, cc_soc_sw, cc_delta;
+	int64_t cc_delta_100pct, cc_delta_uah;
+
+	rc = cl->get_cc_soc(cl->data, &cc_soc_sw);
+	if (rc < 0) {
+		pr_err("Error in getting CC_SOC_SW, rc=%d\n", rc);
+		return rc;
+	}
+
+	cc_delta = cc_soc_sw - cl->init_cc_soc_sw;
+	cc_delta_100pct = conv_cc_soc_to_cp(cl, cc_delta);
+	cc_delta_uah = div64_s64(cl->learned_cap_uah * cc_delta_100pct, 10000);
+	cl->final_cap_uah = cl->init_cap_uah + cc_delta_uah;
+	fg_alg_somc_cl_dbg("cc_delta_100pct:%d cc_delta_uah:%d init_cap_uah:%d final_cap_uah:%d\n",
+					cc_delta_100pct, cc_delta_uah,
+					cl->init_cap_uah, cl->final_cap_uah);
 	return 0;
 #endif
 }
@@ -612,7 +615,7 @@ static int cap_learning_begin(struct cap_learning *cl, u32 batt_soc_cp)
 	cl->init_cc_soc_sw = cc_soc_sw;
 	cl->init_batt_soc = batt_soc_pct;
 	cl->init_batt_soc_cp = batt_soc_cp;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	cl->learning_trial_counter++;
 #endif
 	pr_debug("Capacity learning started @ battery SOC %d init_cc_soc_sw:%d\n",
@@ -655,7 +658,7 @@ out:
 	return rc;
 }
 
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 /**
  * cap_wt_learning_update -
  * @cl: Capacity learning object
@@ -698,7 +701,12 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 			int batt_soc_cp, int charge_status, bool charge_done,
 			bool input_present, bool qnovo_en)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc;
+	u32 batt_soc_prime;
+	bool prime_cc = false;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc, batt_soc_prime;
 	int msoc, cc_soc_sw;
 	int ccsoc_cp, init_ccsoc_cp;
@@ -706,17 +714,13 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 	bool prime_cc = false;
 	bool deactive = false;
 	ktime_t ktime;
-#else
-	int rc;
-	u32 batt_soc_prime;
-	bool prime_cc = false;
 #endif
 	if (!cl)
 		return;
 
 	mutex_lock(&cl->lock);
 
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (batt_temp > cl->dt.max_temp || batt_temp < cl->dt.min_temp ||
 		!cl->learned_cap_uah) {
 		cl->active = false;
@@ -779,7 +783,7 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 		}
 	}
 #endif
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 
 	if (cl->get_monotonic_soc) {
 		rc = cl->get_monotonic_soc(cl->data, &msoc);
@@ -955,17 +959,18 @@ void cap_learning_abort(struct cap_learning *cl)
 		return;
 
 	mutex_lock(&cl->lock);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	fg_alg_somc_cl_dbg("Aborting cap_learning\n");
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	pr_debug("Aborting cap_learning\n");
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	fg_alg_somc_cl_dbg("Aborting cap_learning\n");
 #endif
 	cl->active = false;
 	cl->init_cap_uah = 0;
 	mutex_unlock(&cl->lock);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void cap_learning_somc_lift_learned_cap(struct cap_learning *cl,
 					int64_t ncap_old, int64_t ncap_new)
 {
@@ -1021,43 +1026,7 @@ void cap_learning_somc_limit_learned_cap(struct cap_learning *cl)
  */
 int cap_learning_post_profile_init(struct cap_learning *cl, int64_t nom_cap_uah)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	int64_t ncap_tmp;
-	int rc;
-
-	if (!cl || !cl->data)
-		return -EINVAL;
-
-	mutex_lock(&cl->lock);
-
-	ncap_tmp = cl->nom_cap_uah;
-	cl->nom_cap_uah = nom_cap_uah;
-
-	/* load capacity */
-	rc = cl->get_learned_capacity(cl->data, &cl->learned_cap_uah);
-	if (rc < 0) {
-		pr_err("Couldn't get learned capacity, rc=%d\n", rc);
-		goto out;
-	}
-
-	if (cl->learned_cap_uah == 0) {
-		cl->learned_cap_uah = cl->nom_cap_uah;
-	}
-
-	/* corerct 1) lifting up or down */
-	cap_learning_somc_lift_learned_cap(cl, ncap_tmp, nom_cap_uah);
-
-	/* corerct 2) capping */
-	cap_learning_somc_limit_learned_cap(cl);
-
-	/* save capacity */
-	rc = cl->store_learned_capacity(cl->data, cl->learned_cap_uah);
-	if (rc < 0)
-		pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
-out:
-	mutex_unlock(&cl->lock);
-	return rc;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int64_t delta_cap_uah, pct_nom_cap_uah;
 	int rc;
 
@@ -1094,6 +1063,43 @@ out:
 			pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
 	}
 
+out:
+	mutex_unlock(&cl->lock);
+	return rc;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int64_t ncap_tmp;
+	int rc;
+
+	if (!cl || !cl->data)
+		return -EINVAL;
+
+	mutex_lock(&cl->lock);
+
+	ncap_tmp = cl->nom_cap_uah;
+	cl->nom_cap_uah = nom_cap_uah;
+
+	/* load capacity */
+	rc = cl->get_learned_capacity(cl->data, &cl->learned_cap_uah);
+	if (rc < 0) {
+		pr_err("Couldn't get learned capacity, rc=%d\n", rc);
+		goto out;
+	}
+
+	if (cl->learned_cap_uah == 0) {
+		cl->learned_cap_uah = cl->nom_cap_uah;
+	}
+
+	/* corerct 1) lifting up or down */
+	cap_learning_somc_lift_learned_cap(cl, ncap_tmp, nom_cap_uah);
+
+	/* corerct 2) capping */
+	cap_learning_somc_limit_learned_cap(cl);
+
+	/* save capacity */
+	rc = cl->store_learned_capacity(cl->data, cl->learned_cap_uah);
+	if (rc < 0)
+		pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
 out:
 	mutex_unlock(&cl->lock);
 	return rc;

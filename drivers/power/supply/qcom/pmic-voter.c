@@ -161,7 +161,7 @@ static int get_client_id(struct votable *votable, const char *client_str)
 			return i;
 		}
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	pr_err("===========================================================\n");
 	pr_err("[PMIC-VOTER] %s: Couldn't regist new client:%s due to full clients!! \n",
 						votable->name, client_str);

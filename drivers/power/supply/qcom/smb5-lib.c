@@ -4,11 +4,6 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-#include <linux/seq_file.h>
-#include <linux/uaccess.h>
-#include <linux/fs.h>
-#endif
 #include <linux/device.h>
 #include <linux/regmap.h>
 #include <linux/delay.h>
@@ -21,7 +16,7 @@
 #include <linux/ktime.h>
 #include <linux/usb/typec.h>
 #include <linux/alarmtimer.h>
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #include <linux/input.h>
 #include <drm/drm_panel.h>
 #endif
@@ -60,18 +55,12 @@ bool is_tp_on(void)
 EXPORT_SYMBOL(is_tp_on);
 static void update_sw_icl_max(struct smb_charger *chg, int val);
 static int smblib_get_prop_typec_mode(struct smb_charger *chg);
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 /*add by BSP Group for pd cc pin open start*/
 static void set_cc_pin_default(struct smb_charger *chg);
 static void set_cc_pin_open(struct smb_charger *chg);
 /*add by BSP Group for pd cc pin open end*/
-#endif
 
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-static int screen_state = 1;
-#endif
-
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #if defined(CONFIG_SERIAL_MSM_GENI) && defined(CONFIG_SERIAL_MSM_GENI_CONSOLE)
 extern int msm_geni_serial_gpio_suspend(bool state);
 #endif
@@ -103,7 +92,10 @@ int smblib_write(struct smb_charger *chg, u16 addr, u8 val)
 int smblib_batch_write(struct smb_charger *chg, u16 addr, u8 *val,
 			int count)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	return regmap_bulk_write(chg->regmap, addr, val, count);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	/* Bulk write error sometimes occurs. Replace it to byte-write. */
 	int i;
 	int rc = 0;
@@ -117,8 +109,6 @@ int smblib_batch_write(struct smb_charger *chg, u16 addr, u8 *val,
 		}
 	}
 	return rc;
-#else
-	return regmap_bulk_write(chg->regmap, addr, val, count);
 #endif
 }
 
@@ -663,7 +653,7 @@ int smblib_get_aicl_cont_threshold(struct smb_chg_param *param, u8 val_raw)
 	return base + (reg * step);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void determine_charger_type(struct smb_charger *chg, bool determined)
 {
 	if (!chg->charger_type_determined && determined)
@@ -1114,7 +1104,7 @@ int smblib_get_qc3_main_icl_offset(struct smb_charger *chg, int *offset_ua)
 	return 0;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void start_timed_fake_charging(struct smb_charger *chg,
 						unsigned int delay_msecs)
 {
@@ -1345,7 +1335,7 @@ static int smblib_notifier_call(struct notifier_block *nb,
 		if (ev == PSY_EVENT_PROP_CHANGED)
 			schedule_work(&chg->bms_update_work);
 	}
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->jeita_configured == JEITA_CFG_NONE)
 		schedule_work(&chg->jeita_update_work);
 #endif
@@ -1542,7 +1532,7 @@ static int smblib_get_pulse_cnt(struct smb_charger *chg, int *count)
 }
 
 #define USBIN_25MA	25000
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define USBIN_50MA	50000
 #endif
 #define USBIN_100MA	100000
@@ -1550,7 +1540,7 @@ static int smblib_get_pulse_cnt(struct smb_charger *chg, int *count)
 #define USBIN_500MA	500000
 #define USBIN_900MA	900000
 #define USBIN_1000MA	1000000
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static int set_sdp_current(struct smb_charger *chg, int icl_ua)
 {
 	int rc;
@@ -1611,7 +1601,7 @@ static int set_sdp_current(struct smb_charger *chg, int icl_ua)
 }
 #endif
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define MINIMUM_CURRENT_UA 50000
 #endif
 int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
@@ -1620,7 +1610,7 @@ int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
 	enum icl_override_mode icl_override = HW_AUTO_MODE;
 	/* suspend if 25mA or less is requested */
 	bool suspend = (icl_ua <= USBIN_25MA);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	u8 reg;
 	bool two_step_setting = false;
 #endif
@@ -1640,26 +1630,7 @@ int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
 		goto set_mode;
 
 	/* configure current */
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	rc = smblib_read(chg, USBIN_CMD_IL_REG, &reg);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read USBIN_CMD_IL rc=%d\n", rc);
-		goto out;
-	}
-
-	if ((reg & USBIN_SUSPEND_BIT) && (icl_ua > MINIMUM_CURRENT_UA)) {
-		two_step_setting = true;
-		rc = smblib_set_charge_param(chg, &chg->param.usb_icl,
-							MINIMUM_CURRENT_UA);
-	} else {
-		rc = smblib_set_charge_param(chg, &chg->param.usb_icl, icl_ua);
-	}
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't set HC ICL rc=%d\n", rc);
-		goto out;
-	}
-	icl_override = SW_OVERRIDE_HC_MODE;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->real_charger_type == POWER_SUPPLY_TYPE_USB
 		&& (chg->typec_legacy
 		|| chg->typec_mode == QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT
@@ -1690,13 +1661,33 @@ int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
 		icl_override = SW_OVERRIDE_HC_MODE;
 	}
 #endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	rc = smblib_read(chg, USBIN_CMD_IL_REG, &reg);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read USBIN_CMD_IL rc=%d\n", rc);
+		goto out;
+	}
+
+	if ((reg & USBIN_SUSPEND_BIT) && (icl_ua > MINIMUM_CURRENT_UA)) {
+		two_step_setting = true;
+		rc = smblib_set_charge_param(chg, &chg->param.usb_icl,
+							MINIMUM_CURRENT_UA);
+	} else {
+		rc = smblib_set_charge_param(chg, &chg->param.usb_icl, icl_ua);
+	}
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't set HC ICL rc=%d\n", rc);
+		goto out;
+	}
+	icl_override = SW_OVERRIDE_HC_MODE;
+#endif
 set_mode:
 	rc = smblib_icl_override(chg, icl_override);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't set ICL override rc=%d\n", rc);
 		goto out;
 	}
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 unsuspend:
 #endif
 	/* unsuspend after configuring current and override */
@@ -1706,7 +1697,7 @@ unsuspend:
 		goto out;
 	}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (two_step_setting) {
 		rc = smblib_set_charge_param(chg, &chg->param.usb_icl, icl_ua);
 		if (rc < 0) {
@@ -1719,7 +1710,7 @@ unsuspend:
 #endif
 
 	/* Re-run AICL */
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (icl_override != SW_OVERRIDE_HC_MODE)
 #endif
 		rc = smblib_run_aicl(chg, RERUN_AICL);
@@ -2197,29 +2188,12 @@ int smblib_get_prop_batt_present(struct smb_charger *chg,
 	return rc;
 }
 
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-int smblib_get_prop_batt_charging_enable(struct smb_charger *chg,
-				  union power_supply_propval *val){
-	int rc;
-	u8 regval;
-
-	rc = smblib_read(chg, CHARGING_ENABLE_CMD_REG, &regval);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read CHARGING_ENABLE_CMD_REG rc=%d\n", rc);
-		return rc;
-	}
-	val->intval = (regval & CHARGING_ENABLE_CMD_BIT? 1 :0);
-	return 0;
-}
-
-#endif
-
 int smblib_get_prop_batt_capacity(struct smb_charger *chg,
 				  union power_supply_propval *val)
 {
 	int rc = -EINVAL;
 
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->fake_capacity >= 0) {
 		val->intval = chg->fake_capacity;
 		return 0;
@@ -2229,7 +2203,7 @@ int smblib_get_prop_batt_capacity(struct smb_charger *chg,
 	if (rc < 0)
 		smblib_err(chg, "Couldn't get capacity prop rc=%d\n", rc);
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	smblib_somc_lrc_check(chg);
 	val->intval = smblib_somc_lrc_get_capacity(chg, val->intval);
 	if (rc < 0) {
@@ -2377,7 +2351,7 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 		}
 		return rc;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (!get_effective_result(chg->fake_chg_disallow_votable)) {
 		if (get_effective_result(chg->fake_chg_votable)) {
 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
@@ -2526,12 +2500,13 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 	smblib_dbg(chg, PR_REGISTER, "BATTERY_CHARGER_STATUS_2 = 0x%02x\n",
 		   stat);
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	if (stat & CHARGER_ERROR_STATUS_BAT_OV_BIT) {
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (stat & CHARGER_ERROR_STATUS_BAT_OV_BIT &&
 		(!chg->jeita_condition ||
 		chg->jeita_condition != TEMP_CONDITION_WARM)) {
-#else
-	if (stat & CHARGER_ERROR_STATUS_BAT_OV_BIT) {
 #endif
 		rc = smblib_get_prop_from_bms(chg, SMB5_QG_VOLTAGE_NOW,
 				&pval.intval);
@@ -2560,7 +2535,19 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 			rc);
 		return rc;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	if (stat & BAT_TEMP_STATUS_TOO_COLD_BIT)
+		val->intval = POWER_SUPPLY_HEALTH_COLD;
+	else if (stat & BAT_TEMP_STATUS_TOO_HOT_BIT)
+		val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
+	else if (stat & BAT_TEMP_STATUS_COLD_SOFT_BIT)
+		val->intval = POWER_SUPPLY_HEALTH_COOL;
+	else if (stat & BAT_TEMP_STATUS_HOT_SOFT_BIT)
+		val->intval = POWER_SUPPLY_HEALTH_WARM;
+	else
+		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->jeita_condition) {
 		if (stat & BAT_TEMP_STATUS_TOO_COLD_BIT) {
 			val->intval = POWER_SUPPLY_HEALTH_COLD;
@@ -2597,17 +2584,6 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 		else
 			val->intval = POWER_SUPPLY_HEALTH_GOOD;
 	}
-#else
-	if (stat & BAT_TEMP_STATUS_TOO_COLD_BIT)
-		val->intval = POWER_SUPPLY_HEALTH_COLD;
-	else if (stat & BAT_TEMP_STATUS_TOO_HOT_BIT)
-		val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
-	else if (stat & BAT_TEMP_STATUS_COLD_SOFT_BIT)
-		val->intval = POWER_SUPPLY_HEALTH_COOL;
-	else if (stat & BAT_TEMP_STATUS_HOT_SOFT_BIT)
-		val->intval = POWER_SUPPLY_HEALTH_WARM;
-	else
-		val->intval = POWER_SUPPLY_HEALTH_GOOD;
 #endif
 
 done:
@@ -2617,7 +2593,7 @@ done:
 int smblib_get_prop_system_temp_level(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	val->intval = chg->somc_system_temp_level;
 #else
 	val->intval = chg->system_temp_level;
@@ -2628,7 +2604,7 @@ int smblib_get_prop_system_temp_level(struct smb_charger *chg,
 int smblib_get_prop_system_temp_level_max(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	val->intval = chg->somc_system_temp_level_max;
 #else
 	val->intval = chg->thermal_levels;
@@ -2734,7 +2710,7 @@ int smblib_get_batt_current_now(struct smb_charger *chg,
 	return rc;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 int smblib_get_prop_charging_enabled(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
@@ -2797,73 +2773,26 @@ int smblib_set_prop_batt_status(struct smb_charger *chg,
 	return 0;
 }
 
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-#ifdef CHARGE_SCREEN_ON_OFF /* debug screen_on/screen_off */
-#define BACKLIGHT_NAME "/sys/class/backlight/panel0-backlight/brightness"
-int smblib_get_screen_state(struct smb_charger *chg)
-{
-	struct file *pfile = NULL;
-	//mm_segment_t old_fs;
-	loff_t pos;
-
-	ssize_t ret = 0;
-	char brightness[10];
-	memset(brightness, 0, sizeof(brightness));
-
-	pfile = filp_open(BACKLIGHT_NAME, O_RDONLY, 0);
-	if (IS_ERR(pfile)) {
-		smblib_err(chg, "open BACKLIGHT_NAME  file failed!\n");
-		goto ERR_0;
-	}
-
-	//old_fs = get_fs();
-	//set_fs(KERNEL_DS);
-	pos = 0;
-
-	ret = kernel_read(pfile, brightness, 10, &pos);
-	if(ret <= 0) {
-		smblib_err(chg, "read BACKLIGHT_NAME  file failed!\n");
-		goto ERR_1;
-	}
-
-	if(brightness[0] == '0') {
-		screen_state = 0;
-	} else {
-		screen_state = 1;
-	}
-	smblib_dbg(chg, PR_INTERRUPT, "brightness = %s\n", brightness);
-
-ERR_1:
-	filp_close(pfile, NULL);
-	//set_fs(old_fs);
-	return 0;
-
-ERR_0:
-	return -1;
-}
-#endif
-#endif
-
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
 	if (val->intval < 0)
 		return -EINVAL;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->somc_system_temp_level_max <= 0)
 #else
 	if (chg->thermal_levels <= 0)
 #endif
 		return -EINVAL;
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (val->intval > chg->somc_system_temp_level_max)
 #else
 	if (val->intval > chg->thermal_levels)
 #endif
 		return -EINVAL;
 
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chg->system_temp_level = val->intval;
 
 	if (chg->system_temp_level == chg->thermal_levels)
@@ -2871,53 +2800,18 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 			THERMAL_DAEMON_VOTER, true, 0);
 
 	vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
-#endif
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-#ifdef CHARGE_SCREEN_ON_OFF /* debug screen_on/screen_off */
-	smblib_get_screen_state(chg);
-#endif
-
-	if (screen_state == 1) {
-		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation[chg->system_temp_level]);
-		vote(chg->usb_icl_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation[chg->system_temp_level]);
-		smblib_dbg(chg, PR_INTERRUPT, "screen_on state=%d,thermal_mitigation=%d\n",
-			screen_state, chg->thermal_mitigation[chg->system_temp_level]);
-	} else {
-		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation_sleep[chg->system_temp_level]);
-		vote(chg->usb_icl_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation_sleep[chg->system_temp_level]);
-		smblib_dbg(chg, PR_INTERRUPT, "screen_off state=%d,thermal_mitigation_sleep=%d\n",
-			screen_state, chg->thermal_mitigation_sleep[chg->system_temp_level]);
-	}
-#else
 	if (chg->system_temp_level == 0)
 		return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
 
 	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
 			chg->thermal_mitigation[chg->system_temp_level]);
 #endif
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chg->somc_system_temp_level = val->intval;
 	somc_apply_thermal_mitigation(chg);
 #endif
 	return 0;
 }
-
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-int smblib_set_prop_batt_charging_enable(struct smb_charger *chg,
-				const union power_supply_propval *val){
-	int rc;
-	u8 write_value = (u8)val->intval;
-	rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG, CHARGING_ENABLE_CMD_BIT, write_value);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't write to CHARGING_ENABLE_CMD_REG rc=%d\n", rc);
-	}
-	return rc;
-}
-#endif
 
 int smblib_set_prop_input_current_limited(struct smb_charger *chg,
 				int val)
@@ -3363,7 +3257,6 @@ static int smblib_update_thermal_readings(struct smb_charger *chg)
 	return rc;
 }
 
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 /*add by BSP Group for pd cc pin open start*/
 static void set_cc_pin_open(struct smb_charger *chg)
 {
@@ -3404,17 +3297,12 @@ static void set_cc_pin_default(struct smb_charger *chg)
 	smblib_err(chg, "reset cc_pin_open=%d\n", chg->cc_pin_open);
 }
 /*add by BSP Group for pd cc pin open end*/
-#endif
 /* SW thermal regulation thresholds in deciDegC */
 #define DIE_TEMP_RST_THRESH		1000
 #define DIE_TEMP_REG_H_THRESH		800
 #define DIE_TEMP_REG_L_THRESH		600
 
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 #define CONNECTOR_TEMP_SHDN_THRESH	1240
-#else
-#define CONNECTOR_TEMP_SHDN_THRESH	700
-#endif
 #define CONNECTOR_TEMP_RST_THRESH	600
 #define CONNECTOR_TEMP_REG_H_THRESH	550
 #define CONNECTOR_TEMP_REG_L_THRESH	500
@@ -3454,20 +3342,17 @@ static int smblib_process_thermal_readings(struct smb_charger *chg)
 	 * connector, smb or skin temp exceeds it's respective REG_H or REG_L
 	 * threshold. Unsuspend input and SMB.
 	 */
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 	if(chg->usb_connect_hot) {
 		pr_err("charge function has disable,must restroe device!\n");
 		return rc;
 	}
-#endif
+
 	if (chg->connector_temp > CONNECTOR_TEMP_SHDN_THRESH ||
 		chg->skin_temp > SKIN_TEMP_SHDN_THRESH) {
 		thermal_status = TEMP_SHUT_DOWN;
 		wdog_timeout = SNARL_WDOG_TMOUT_1S;
 		suspend_input = true;
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 		chg->usb_connect_hot = true;
-#endif
 		disable_smb = true;
 		goto out;
 	}
@@ -3549,14 +3434,13 @@ out:
 							suspend_input, 0);
 		vote(chg->usb_icl_votable, SW_THERM_REGULATION_VOTER,
 							suspend_input, 0);
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
+
 		/* CC open/reset */
 		if (suspend_input ) {
 			set_cc_pin_open(chg);
 		}else {
 			set_cc_pin_default(chg);
 		}
-#endif
 		smblib_dbg(chg, PR_MISC, "USB/DC %s as per SW thermal regulation\n",
 				suspend_input ? "suspended" : "unsuspended");
 	}
@@ -3582,7 +3466,7 @@ exit:
 	return rc;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 int smblib_set_prop_charging_enabled(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
@@ -3849,9 +3733,7 @@ int smblib_get_prop_usb_present(struct smb_charger *chg,
 	}
 
 	val->intval = (bool)(stat & USBIN_PLUGIN_RT_STS_BIT);
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
 	charger_tp = val->intval;
-#endif
 	return 0;
 }
 
@@ -3860,11 +3742,11 @@ int smblib_get_prop_usb_online(struct smb_charger *chg,
 {
 	int rc = 0;
 	u8 stat;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int org_online;
 #endif
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	rc = smblib_get_prop_from_bms(chg, SMB5_QG_CAPACITY, &val->intval);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't get prop capacity rc=%d\n", rc);
@@ -3899,7 +3781,7 @@ int smblib_get_prop_usb_online(struct smb_charger *chg,
 
 	val->intval = (stat & USE_USBIN_BIT) &&
 		      (stat & VALID_INPUT_POWER_SOURCE_STS_BIT);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	org_online = val->intval;
 	rc = smblib_get_prop_usb_present(chg, val);
 	if (rc < 0) {
@@ -3957,11 +3839,7 @@ int smblib_get_prop_usb_voltage_max_design(struct smb_charger *chg,
 		if (chg->chg_param.smb_version == PMI632)
 			val->intval = MICRO_9V;
 		else
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-			val->intval = MICRO_12V;
-#else
 			val->intval = MICRO_9V;
-#endif
 		break;
 	default:
 		val->intval = MICRO_5V;
@@ -4008,9 +3886,7 @@ int smblib_get_prop_usb_voltage_max(struct smb_charger *chg,
 static int smblib_estimate_adaptor_voltage(struct smb_charger *chg,
 					  union power_supply_propval *val)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	val->intval = 10000000;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int step_uv = HVDCP3_STEP_UV;
 
 	switch (chg->real_charger_type) {
@@ -4032,7 +3908,9 @@ static int smblib_estimate_adaptor_voltage(struct smb_charger *chg,
 		break;
 	}
 #endif
-
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	val->intval = 10000000;
+#endif
 	return 0;
 }
 
@@ -4878,16 +4756,17 @@ static int get_rp_based_dcp_current(struct smb_charger *chg, int typec_mode)
 	case QTI_POWER_SUPPLY_TYPEC_SOURCE_HIGH:
 		rp_ua = TYPEC_HIGH_CURRENT_UA;
 		break;
-#if defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if 0
+		case QTI_POWER_SUPPLY_TYPEC_SOURCE_MEDIUM:
+		case QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT:
+#endif
+/* Modify[HQ]:Default Float current 1.5A -> 0.5A */
 	case QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT:
 	case QTI_POWER_SUPPLY_TYPEC_NONE:
 		rp_ua = SDP_CURRENT_UA;
 		break;
 	case QTI_POWER_SUPPLY_TYPEC_SOURCE_MEDIUM:
-#else
-	case QTI_POWER_SUPPLY_TYPEC_SOURCE_MEDIUM:
-	case QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT:
-#endif
+/* end */
 	/* fall through */
 	default:
 		rp_ua = DCP_CURRENT_UA;
@@ -4907,11 +4786,7 @@ int smblib_set_prop_pd_current_max(struct smb_charger *chg,
 
 	if (chg->pd_active) {
 		icl = get_client_vote(chg->usb_icl_votable, PD_VOTER);
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-		rc = vote(chg->usb_icl_votable, PD_VOTER, true, 3300000);
-#else
 		rc = vote(chg->usb_icl_votable, PD_VOTER, true, val);
-#endif
 		if (val != icl)
 			power_supply_changed(chg->usb_psy);
 	} else {
@@ -4951,7 +4826,13 @@ static int smblib_handle_usb_current(struct smb_charger *chg,
 				 * based of Rp.
 				 */
 				typec_mode = smblib_get_prop_typec_mode(chg);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+				rp_ua = get_rp_based_dcp_current(chg,
+								typec_mode);
+				rc = vote(chg->usb_icl_votable,
+						SW_ICL_MAX_VOTER, true, rp_ua);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 				if (typec_mode ==
 					QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) {
 					rc = vote(chg->usb_icl_votable,
@@ -4968,11 +4849,6 @@ static int smblib_handle_usb_current(struct smb_charger *chg,
 							SW_ICL_MAX_VOTER,
 							true, DCP_CURRENT_UA);
 				}
-#else
-				rp_ua = get_rp_based_dcp_current(chg,
-								typec_mode);
-				rc = vote(chg->usb_icl_votable,
-						SW_ICL_MAX_VOTER, true, rp_ua);
 #endif
 				if (rc < 0)
 					return rc;
@@ -4998,14 +4874,14 @@ static int smblib_handle_usb_current(struct smb_charger *chg,
 			if (rc < 0)
 				return rc;
 		}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		determine_charger_type(chg, true);
 #endif
 	} else {
 		rc = smblib_get_prop_usb_present(chg, &val);
 		if (!rc && !val.intval)
 			return 0;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (usb_current == USBIN_100MA)
 			usb_current = USBIN_50MA;
 #endif
@@ -5121,7 +4997,7 @@ int smblib_set_prop_typec_power_role(struct smb_charger *chg, int val)
 	if (chg->connector_type == QTI_POWER_SUPPLY_CONNECTOR_MICRO_USB)
 		return 0;
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
         if (chg->cc_reconnection_running) {
                 smblib_dbg(chg, PR_SOMC,
                         "CC reconnection is running, ignore PR setting\n");
@@ -5211,7 +5087,7 @@ unlock:
 	return rc;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 
 int smblib_set_prop_typec_power_role_for_wdet(struct smb_charger *chg,
 				     const union power_supply_propval *val)
@@ -5421,7 +5297,7 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 		if (chg->ok_to_pd) {
 			chg->ok_to_pd = false;
 			smblib_hvdcp_detect_try_enable(chg, true);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 			/*
 			 * In specific CDP charger, it may not be able to detect
 			 * correct type after rerunning APSD, so do not work the
@@ -5454,29 +5330,13 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 		if (typec_rp_med_high(chg, typec_mode))
 			vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->real_charger_type != POWER_SUPPLY_TYPE_UNKNOWN)
 		determine_charger_type(chg, true);
 #endif
 	power_supply_changed(chg->usb_psy);
 	return rc;
 }
-
-#if defined(CONFIG_ARCH_SONY_MURRAY)
-int smblib_get_prop_set_ship_mode(struct smb_charger *chg,
-				  union power_supply_propval *val){
-	int rc;
-	u8 regval;
-
-	rc = smblib_read(chg, SHIP_MODE_REG, &regval);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read SHIP_MODE_REG rc=%d\n", rc);
-		return rc;
-	}
-	val->intval = (regval & SHIP_MODE_EN_BIT? 1 :0);
-	return 0;
-}
-#endif
 
 int smblib_set_prop_ship_mode(struct smb_charger *chg,
 				int val)
@@ -5513,7 +5373,7 @@ int smblib_set_prop_pd_in_hard_reset(struct smb_charger *chg,
 	return rc;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define DURING_POWER_OFF_CHARGE 1
 static void somc_chg_remove_work(struct work_struct *work)
 {
@@ -5932,7 +5792,7 @@ irqreturn_t smb5_chg_state_change_irq_handler(int irq, void *data)
 
 	if (chg->wa_flags & CHG_TERMINATION_WA)
 		smblib_eval_chg_termination(chg, stat);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (stat == TERMINATE_CHARGE &&
 				chg->jeita_condition == TEMP_CONDITION_WARM)
 		start_fake_charging(chg, SOMC_JEITA_WARM_FULL_VOTER);
@@ -5949,7 +5809,7 @@ irqreturn_t smb5_batt_temp_changed_irq_handler(int irq, void *data)
 	struct smb_charger *chg = irq_data->parent_data;
 	int rc;
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	u8 stat7;
 
 	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_7_REG, &stat7);
@@ -5987,12 +5847,13 @@ irqreturn_t smb5_batt_psy_changed_irq_handler(int irq, void *data)
 }
 
 #define AICL_STEP_MV		200
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-#define MAX_AICL_THRESHOLD_MV	4700
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define MAX_AICL_THRESHOLD_MV	4800
 #endif
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define MAX_AICL_THRESHOLD_MV	4700
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define USBIN_UV_MASKING_TIME_MS	100
 #endif
 irqreturn_t smb5_usbin_uv_irq_handler(int irq, void *data)
@@ -6005,7 +5866,7 @@ irqreturn_t smb5_usbin_uv_irq_handler(int irq, void *data)
 	u8 stat = 0, max_pulses = 0;
 
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	rc = smblib_read(chg, USB_INT_RT_STS_REG, &stat);
 	if (!rc && (stat & USBIN_UV_RT_STS_BIT))
 		start_timed_fake_charging(chg, USBIN_UV_MASKING_TIME_MS);
@@ -6019,11 +5880,12 @@ irqreturn_t smb5_usbin_uv_irq_handler(int irq, void *data)
 			return IRQ_HANDLED;
 		}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-		smblib_dbg(chg, PR_SOMC, "USBIN_UV storm at threshold %d\n",
-				chg->aicl_5v_threshold_mv);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		smblib_dbg(chg, PR_MISC, "USBIN_UV storm at threshold %d\n",
+				chg->aicl_5v_threshold_mv);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		smblib_dbg(chg, PR_SOMC, "USBIN_UV storm at threshold %d\n",
 				chg->aicl_5v_threshold_mv);
 #endif
 
@@ -6063,11 +5925,12 @@ unsuspend_input:
 			schgm_flash_torch_priority(chg, TORCH_BOOST_MODE);
 
 		if (chg->aicl_max_reached) {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-			smblib_dbg(chg, PR_SOMC,
-				"Reached max AICL threshold resctricting ICL to 100mA\n");
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 			smblib_dbg(chg, PR_MISC,
+				"Reached max AICL threshold resctricting ICL to 100mA\n");
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+			smblib_dbg(chg, PR_SOMC,
 				"Reached max AICL threshold resctricting ICL to 100mA\n");
 #endif
 			vote(chg->usb_icl_votable, AICL_THRESHOLD_VOTER,
@@ -6353,7 +6216,7 @@ static void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 }
 
 #define PL_DELAY_MS	30000
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define REMOVE_DELAY_MS		2000
 #define UNPLUG_WAKE_PERIOD	5000
 #endif
@@ -6453,7 +6316,7 @@ static void smblib_usb_plugin_locked(struct smb_charger *chg)
 			smblib_err(chg, "Couldn't disable DPDM rc=%d\n", rc);
 
 		smblib_update_usb_type(chg);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		smblib_somc_lrc_check(chg);
 		__pm_wakeup_event(chg->unplug_wakelock,
 						UNPLUG_WAKE_PERIOD);
@@ -6589,7 +6452,7 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 {
 	int typec_mode;
 	int rp_ua;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	const struct apsd_result *apsd = smblib_get_apsd_result(chg);
 
 	val = apsd->val;
@@ -6600,7 +6463,7 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 		return;
 
 	if (chg->typec_mode == QTI_POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER) {
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 500000);
 #endif
 		return;
@@ -6615,11 +6478,12 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 
 	/* TypeC rp med or high, use rp value */
 	typec_mode = smblib_get_prop_typec_mode(chg);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	if (typec_rp_med_high(chg, typec_mode)) {
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (typec_rp_med_high(chg, typec_mode) &&
 				val == POWER_SUPPLY_TYPE_USB_DCP) {
-#else
-	if (typec_rp_med_high(chg, typec_mode)) {
 #endif
 		rp_ua = get_rp_based_dcp_current(chg, typec_mode);
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, rp_ua);
@@ -6635,13 +6499,14 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 		 */
 		if (!is_client_vote_enabled(chg->usb_icl_votable,
 						USB_PSY_VOTER)) {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-			vote(chg->usb_icl_votable, USB_PSY_VOTER, true, 0);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 			/* if flash is active force 500mA */
 			vote(chg->usb_icl_votable, USB_PSY_VOTER, true,
 					is_flash_active(chg) ?
 					SDP_CURRENT_UA : SDP_100_MA);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+			vote(chg->usb_icl_votable, USB_PSY_VOTER, true, 0);
 #endif
 		}
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, false, 0);
@@ -6651,23 +6516,25 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 					CDP_CURRENT_UA);
 		break;
 	case POWER_SUPPLY_TYPE_USB_DCP:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		rp_ua = get_rp_based_dcp_current(chg, typec_mode);
+		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, rp_ua);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (apsd->bit & OCP_CHARGER_BIT)
 			vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true,
 							OCP_CURRENT_UA);
 		else
 			vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true,
 							DCP_CURRENT_UA);
-#else
-		rp_ua = get_rp_based_dcp_current(chg, typec_mode);
-		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, rp_ua);
 #endif
 		break;
 	case QTI_POWER_SUPPLY_TYPE_USB_FLOAT:
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+/* Modify[HQ]:remove native logic, set float current according to Rp */
 		rp_ua = get_rp_based_dcp_current(chg, typec_mode);
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, rp_ua);
-#else
+/* end */
+#if	0
 		/*
 		 * limit ICL to 100mA, the USB driver will enumerate to check
 		 * if this is a SDP and appropriately set the current
@@ -6678,7 +6545,7 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 		break;
 	case POWER_SUPPLY_TYPE_UNKNOWN:
 	default:
-#if !defined(CONFIG_SOMC_CHARGER_EXTENSION) || defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true,
 					SDP_100_MA);
 #endif
@@ -6710,7 +6577,7 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 	default:
 		break;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (!chg->ok_to_pd && apsd_result->bit != FLOAT_CHARGER_BIT)
 		determine_charger_type(chg, true);
 #endif
@@ -6878,7 +6745,7 @@ static void typec_src_fault_condition_cfg(struct smb_charger *chg, bool src)
 			rc);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void smblib_somc_set_typec_currsrc_medium(struct smb_charger *chg,
 							bool enable)
 {
@@ -6910,7 +6777,7 @@ static void typec_sink_insertion(struct smb_charger *chg)
 	if (!chg->pr_swap_in_progress)
 		chg->ok_to_pd = (!(chg->pd_disabled) || chg->early_usb_attach)
 					&& !chg->pd_not_supported;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	smblib_somc_set_typec_currsrc_medium(chg, false);
 #endif
 }
@@ -6939,7 +6806,7 @@ static void typec_src_insertion(struct smb_charger *chg)
 	/* allow apsd proceed to detect QC2/3 */
 	if (!chg->ok_to_pd)
 		smblib_hvdcp_detect_try_enable(chg, true);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 
 	/* disable APSD CC trigger since CC is attached */
 	rc = smblib_masked_write(chg, TYPE_C_CFG_REG,
@@ -6951,13 +6818,14 @@ static void typec_src_insertion(struct smb_charger *chg)
 
 static void typec_ra_ra_insertion(struct smb_charger *chg)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	chg->ok_to_pd = false;
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 500000);
 	vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
 	chg->ok_to_pd = false;
 	smblib_hvdcp_detect_enable(chg, true);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chg->ok_to_pd = false;
 #endif
 }
 
@@ -7153,11 +7021,12 @@ static void typec_src_removal(struct smb_charger *chg)
 	cancel_delayed_work_sync(&chg->pl_enable_work);
 
 	/* reset input current limit voters */
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 0);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true,
 			is_flash_active(chg) ? SDP_CURRENT_UA : SDP_100_MA);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 0);
 #endif
 	vote(chg->usb_icl_votable, PD_VOTER, false, 0);
 	vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
@@ -7242,7 +7111,7 @@ static void typec_src_removal(struct smb_charger *chg)
 			smblib_err(chg, "Couldn't restore aicl_cont_threshold, rc=%d",
 					rc);
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	/* enable APSD CC trigger for next insertion */
 	rc = smblib_masked_write(chg, TYPE_C_CFG_REG,
 				BC1P2_START_ON_CC_BIT, BC1P2_START_ON_CC_BIT);
@@ -7282,17 +7151,18 @@ static void typec_src_removal(struct smb_charger *chg)
 
 	del_timer_sync(&chg->apsd_timer);
 	chg->apsd_ext_timeout = false;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	determine_charger_type(chg, false);
 #endif
 }
 
 static void typec_mode_unattached(struct smb_charger *chg)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 0);
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, USBIN_100MA);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, 0);
 #endif
 }
 
@@ -7479,12 +7349,12 @@ irqreturn_t smb5_typec_attach_detach_irq_handler(int irq, void *data)
 		if (rc < 0)
 			smblib_err(chg, "failed to register partner rc =%d\n",
 					rc);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chg->cc_reconnection_running)
 			complete(&chg->cc_reconnected);
 #endif
 	} else {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		smblib_somc_set_typec_currsrc_medium(chg, true);
 #endif
 		switch (chg->sink_src_mode) {
@@ -7959,7 +7829,7 @@ irqreturn_t smb5_wdog_bark_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define AICL_UPDATE_DELAY_TIME_MS 5000
 irqreturn_t somc_aicl_irq_handler(int irq, void *data)
 {
@@ -8128,7 +7998,7 @@ int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 			smblib_err(chg, "Couldn't read TYPE_C_CCOUT_CONTROL_REG rc=%d\n",
 				rc);
 		}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		smblib_somc_set_typec_currsrc_medium(chg, false);
 #endif
 	} else {
@@ -8140,7 +8010,19 @@ int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 			return rc;
 		}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		/* enable DRP */
+		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
+				 TYPEC_POWER_ROLE_CMD_MASK, 0);
+		if (rc < 0) {
+			smblib_err(chg, "Couldn't enable DRP rc=%d\n", rc);
+			return rc;
+		}
+		chg->power_role = QTI_POWER_SUPPLY_TYPEC_PR_DUAL;
+		smblib_dbg(chg, PR_MISC, "restore power role: %d\n",
+				chg->power_role);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		if (chg->cc_reconnection_running) {
 			smblib_dbg(chg, PR_SOMC,
 				"CC reconnection is running, do not enable DRP\n");
@@ -8152,17 +8034,6 @@ int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 				smblib_err(chg, "Couldn't enable DRP rc=%d\n",
 									rc);
 		}
-#else
-		/* enable DRP */
-		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
-				 TYPEC_POWER_ROLE_CMD_MASK, 0);
-		if (rc < 0) {
-			smblib_err(chg, "Couldn't enable DRP rc=%d\n", rc);
-			return rc;
-		}
-		chg->power_role = QTI_POWER_SUPPLY_TYPEC_PR_DUAL;
-		smblib_dbg(chg, PR_MISC, "restore power role: %d\n",
-				chg->power_role);
 #endif
 	}
 
@@ -8356,7 +8227,6 @@ static void clear_hdc_work(struct work_struct *work)
 	vote(chg->hdc_irq_disable_votable, HDC_IRQ_VOTER, false, 0);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
 static void updata_battery_data(struct smb_charger *chg)
 {
 	union power_supply_propval val;
@@ -8480,7 +8350,7 @@ static void smblib_info_charge_status_work(struct work_struct *work)
 
 	schedule_delayed_work(&chg->info_charge_status_work, msecs_to_jiffies(5000));
 }
-
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void somc_get_active_panel(struct smb_charger *chg)
 {
 	int i;
@@ -8704,7 +8574,7 @@ static void smblib_chg_termination_work(struct work_struct *work)
 	int rc, input_present, delay = CHG_TERM_WA_ENTRY_DELAY_MS;
 	int vbat_now_uv, max_fv_uv;
 	u8 stat = 0;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int cc_soc_to_entry, cc_soc_to_exit;
 #endif
 	/*
@@ -8786,7 +8656,7 @@ static void smblib_chg_termination_work(struct work_struct *work)
 			goto out;
 		}
 		chg->cc_soc_ref = val;
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		smblib_dbg(chg, PR_SOMC, "Updated cc_soc_ref:%d\n",
 							chg->cc_soc_ref);
 #endif
@@ -8825,23 +8695,7 @@ static void smblib_chg_termination_work(struct work_struct *work)
 	 * overshoot range of the cc_soc value at termination and make sure that
 	 * vbat is indeed rising above vfloat.
 	 */
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
-	cc_soc_to_entry = div64_s64((int64_t)chg->cc_soc_ref * 10075, 10000);
-	cc_soc_to_exit = div64_s64((int64_t)chg->cc_soc_ref * 10050, 10000);
-	smblib_dbg(chg, PR_SOMC, "cc_soc: %d, cc_soc_ref: %d\n",
-						pval.intval, chg->cc_soc_ref);
-	if (pval.intval > cc_soc_to_entry) {
-		smblib_dbg(chg, PR_SOMC, "Enable Termination WA due to dececting over current !!\n");
-		vote(chg->usb_icl_votable, CHG_TERMINATION_VOTER, true, 0);
-		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, true, 0);
-		delay = CHG_TERM_WA_EXIT_DELAY_MS;
-	} else if (pval.intval < cc_soc_to_exit) {
-		smblib_dbg(chg, PR_SOMC, "Disable Termination WA\n");
-		vote(chg->usb_icl_votable, CHG_TERMINATION_VOTER, false, 0);
-		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, false, 0);
-		delay = CHG_TERM_WA_ENTRY_DELAY_MS;
-	}
-#else
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (val < DIV_ROUND_CLOSEST(chg->cc_soc_ref * 10050, 10000)) {
 		vote(chg->usb_icl_votable, CHG_TERMINATION_VOTER, false, 0);
 		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, false, 0);
@@ -8863,6 +8717,23 @@ static void smblib_chg_termination_work(struct work_struct *work)
 	smblib_dbg(chg, PR_MISC, "Chg Term WA readings: cc_soc: %d, cc_soc_ref: %d, delay: %d vbat_now %d term_vbat %d\n",
 			val, chg->cc_soc_ref, delay, vbat_now_uv,
 			chg->term_vbat_uv);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	cc_soc_to_entry = div64_s64((int64_t)chg->cc_soc_ref * 10075, 10000);
+	cc_soc_to_exit = div64_s64((int64_t)chg->cc_soc_ref * 10050, 10000);
+	smblib_dbg(chg, PR_SOMC, "cc_soc: %d, cc_soc_ref: %d\n",
+						pval.intval, chg->cc_soc_ref);
+	if (pval.intval > cc_soc_to_entry) {
+		smblib_dbg(chg, PR_SOMC, "Enable Termination WA due to dececting over current !!\n");
+		vote(chg->usb_icl_votable, CHG_TERMINATION_VOTER, true, 0);
+		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, true, 0);
+		delay = CHG_TERM_WA_EXIT_DELAY_MS;
+	} else if (pval.intval < cc_soc_to_exit) {
+		smblib_dbg(chg, PR_SOMC, "Disable Termination WA\n");
+		vote(chg->usb_icl_votable, CHG_TERMINATION_VOTER, false, 0);
+		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, false, 0);
+		delay = CHG_TERM_WA_ENTRY_DELAY_MS;
+	}
 #endif
 	alarm_start_relative(&chg->chg_termination_alarm, ms_to_ktime(delay));
 out:
@@ -8899,14 +8770,15 @@ static void apsd_timer_cb(struct timer_list *tm)
 #define SOFT_JEITA_HYSTERESIS_OFFSET	0x200
 static void jeita_update_work(struct work_struct *work)
 {
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	struct smb_charger *chg = container_of(work, struct smb_charger,
 						jeita_update_work);
 
 	chg->jeita_configured = JEITA_CFG_FAILURE;
 
 	return;
-#else
+#endif
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	struct smb_charger *chg = container_of(work, struct smb_charger,
 						jeita_update_work);
 	struct device_node *node = chg->dev->of_node;
@@ -9110,7 +8982,7 @@ done:
 	pr_debug("Moisture detection disabled\n");
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 void smblib_serial_gpio_pull_down(struct smb_charger *chg)
 {
 	int ret = 0;
@@ -9187,7 +9059,7 @@ static void smblib_lpd_ra_open_work(struct work_struct *work)
 		chg->moisture_present =  true;
 		vote(chg->usb_icl_votable, LPD_VOTER, true, 0);
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #if defined(CONFIG_SERIAL_MSM_GENI) && defined(CONFIG_SERIAL_MSM_GENI_CONSOLE)
 		msm_geni_serial_gpio_suspend(true);
 #endif
@@ -9259,7 +9131,7 @@ relax:
 	pm_relax(chg->dev);
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static void smblib_somc_smart_charge_wdog_work(struct work_struct *work)
 {
 	struct smb_charger *chg = container_of(work, struct smb_charger,
@@ -9498,7 +9370,7 @@ static int smblib_create_votables(struct smb_charger *chg)
 		chg->bat_temp_irq_disable_votable = NULL;
 		return rc;
 	}
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chg->fake_chg_votable = create_votable("FAKE_CHG",
 						VOTE_SET_ANY, NULL, NULL);
 	if (IS_ERR(chg->fake_chg_votable)) {
@@ -9530,7 +9402,7 @@ static void smblib_destroy_votables(struct smb_charger *chg)
 		destroy_votable(chg->chg_disable_votable);
 	if (chg->bat_temp_irq_disable_votable)
 		destroy_votable(chg->bat_temp_irq_disable_votable);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->fake_chg_votable)
 		destroy_votable(chg->fake_chg_votable);
 	if (chg->fake_chg_disallow_votable)
@@ -9570,7 +9442,7 @@ int smblib_init(struct smb_charger *chg)
 	mutex_init(&chg->dcin_aicl_lock);
 	mutex_init(&chg->dpdm_lock);
 	spin_lock_init(&chg->typec_pr_lock);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	mutex_init(&chg->smart_charge_lock);
 	chg->unplug_wakelock = wakeup_source_register(chg->dev, "unplug_wakelock");
 #endif
@@ -9593,14 +9465,12 @@ int smblib_init(struct smb_charger *chg)
 					smblib_pr_swap_detach_work);
 	INIT_DELAYED_WORK(&chg->pr_lock_clear_work,
 					smblib_pr_lock_clear_work);
-#if !defined(CONFIG_ARCH_SONY_MURRAY)
 	INIT_DELAYED_WORK(&chg->info_charge_status_work, smblib_info_charge_status_work);
-#endif
 	timer_setup(&chg->apsd_timer, apsd_timer_cb, 0);
 
 	INIT_DELAYED_WORK(&chg->role_reversal_check,
 					smblib_typec_role_check_work);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	INIT_DELAYED_WORK(&chg->smart_charge_wdog_work,
 					smblib_somc_smart_charge_wdog_work);
 	INIT_DELAYED_WORK(&chg->somc_screen_on_register_notifier_work,
@@ -9648,7 +9518,7 @@ int smblib_init(struct smb_charger *chg)
 		return -ENODEV;
 	}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	/* register input device */
 	chg->unplug_key = input_allocate_device();
 	if (!chg->unplug_key) {
@@ -9688,7 +9558,7 @@ int smblib_init(struct smb_charger *chg)
 				rc);
 			return rc;
 		}
-#if defined(CONFIG_ARCH_SONY_MURRAY)
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		rc = qcom_step_chg_init(chg->dev, chg->step_chg_enabled,
 				chg->sw_jeita_enabled, chg->jeita_arb_enable,
 				chg->iio_chans);
@@ -9766,10 +9636,8 @@ int smblib_init(struct smb_charger *chg)
 		smblib_err(chg, "Unsupported mode %d\n", chg->mode);
 		return -EINVAL;
 	}
-#if !defined(CONFIG_ARCH_SONY_MURRAY)
 	schedule_delayed_work(&chg->info_charge_status_work, msecs_to_jiffies(5000));
-#endif
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	schedule_delayed_work(&chg->somc_screen_on_register_notifier_work,msecs_to_jiffies(7000));
 #endif
 	return rc;
@@ -9798,7 +9666,7 @@ int smblib_deinit(struct smb_charger *chg)
 		cancel_delayed_work_sync(&chg->pl_enable_work);
 		cancel_delayed_work_sync(&chg->uusb_otg_work);
 		cancel_delayed_work_sync(&chg->bb_removal_work);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		cancel_delayed_work_sync(&chg->somc_screen_on_register_notifier_work);
 #endif
 		cancel_delayed_work_sync(&chg->lpd_ra_open_work);
@@ -9807,11 +9675,9 @@ int smblib_deinit(struct smb_charger *chg)
 		cancel_delayed_work_sync(&chg->usbov_dbc_work);
 		cancel_delayed_work_sync(&chg->role_reversal_check);
 		cancel_delayed_work_sync(&chg->pr_swap_detach_work);
-#if !defined(CONFIG_ARCH_SONY_MURRAY)
 		cancel_delayed_work_sync(&chg->info_charge_status_work);
-#endif
 		power_supply_unreg_notifier(&chg->nb);
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		power_supply_unreg_notifier(&chg->fb_notifier);
 #endif
 		smblib_destroy_votables(chg);
@@ -9825,7 +9691,7 @@ int smblib_deinit(struct smb_charger *chg)
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->unplug_key) {
 		input_free_device(chg->unplug_key);
 		chg->unplug_key = NULL;
@@ -9840,7 +9706,7 @@ int smblib_deinit(struct smb_charger *chg)
 	return 0;
 }
 
-#if defined(CONFIG_SOMC_CHARGER_EXTENSION) && defined(CONFIG_ARCH_SONY_ZAMBEZI)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 
 /**************************
  * SOMC feature functions *
