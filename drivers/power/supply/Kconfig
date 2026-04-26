@@ -734,6 +734,11 @@ config IFPM_SM5038
 		This driver provides common support for accessing the device;
 		additional drivers
 
+config SM5038_HVDCP_ENABLED
+	bool "SM5038 HVDCP Support"
+	help
+		Say Y here to enable HVDCP Support for SM5038
+
 source "drivers/power/supply/qcom/Kconfig"
 
 endif # POWER_SUPPLY

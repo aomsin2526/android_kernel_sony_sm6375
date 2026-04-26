@@ -43,6 +43,8 @@ static void sm5038_muic_handle_detach(struct sm5038_muic_data *muic_data,
 			int irq);
 static void sm5038_muic_detect_dev(struct sm5038_muic_data *muic_data, int irq);
 
+static void sm5038_muic_cable_type_notification(struct sm5038_muic_data *muic_data, int cable_type);
+
 extern int sm5038_charger_oper_get_input_current_ua(void);
 extern int sm5038_usbpd_get_otg_status(void);
 extern int sm5038_charger_get_chg_mode_type(void);
