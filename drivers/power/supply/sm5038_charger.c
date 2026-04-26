@@ -61,6 +61,7 @@ enum print_reason {
 #define MICRO_CURR_0P55A	550
 #define MICRO_CURR_1P0A		1000
 #define MICRO_CURR_1P5A		1500
+#define MICRO_CURR_1P75A	1750
 #define MICRO_CURR_2P0A		2000
 #define MICRO_CURR_2P5A		2500
 #define MICRO_CURR_3P0A		3000
@@ -1569,7 +1570,7 @@ static void sm5038_chg_set_vbuslimit_current_by_type(struct sm5038_charger_data 
 	case POWER_SUPPLY_TYPE_USB_HVDCP:
 	case POWER_SUPPLY_TYPE_USB_HVDCP_3:
 	case POWER_SUPPLY_TYPE_USB_HVDCP_3P5:
-		input_current_ma = MICRO_CURR_1P5A;
+		input_current_ma = MICRO_CURR_1P75A;
 		break;
 	case POWER_SUPPLY_TYPE_USB_PD:
 		input_current_ma = MICRO_CURR_3P0A;
