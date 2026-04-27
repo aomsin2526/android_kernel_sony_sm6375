@@ -1570,7 +1570,7 @@ static void sm5038_chg_set_vbuslimit_current_by_type(struct sm5038_charger_data 
 	case POWER_SUPPLY_TYPE_USB_HVDCP:
 	case POWER_SUPPLY_TYPE_USB_HVDCP_3:
 	case POWER_SUPPLY_TYPE_USB_HVDCP_3P5:
-		input_current_ma = MICRO_CURR_1P75A;
+		input_current_ma = MICRO_CURR_2P0A;
 		break;
 	case POWER_SUPPLY_TYPE_USB_PD:
 		input_current_ma = MICRO_CURR_3P0A;
